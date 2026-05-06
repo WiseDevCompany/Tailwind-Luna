@@ -7,6 +7,7 @@ test.describe('Minicart', () => {
 
     const minicart = page.locator('[data-block=minicart]').first();
     await expect(minicart).toBeVisible({ timeout: 30_000 });
+    await expect(minicart.locator('.block-minicart').first()).toBeHidden({ timeout: 30_000 });
 
     await minicart.locator('a.action.showcart').first().click();
 

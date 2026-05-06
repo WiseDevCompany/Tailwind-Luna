@@ -158,6 +158,7 @@
 /* Before / without dialog upgrade: panel is still a direct child */
 .header.content .minicart-wrapper > .block-minicart,
 .page-header .minicart-wrapper > .block-minicart {
+  display: none;
   position: absolute;
   top: 100%;
   right: 0;

@@ -1,11 +1,10 @@
 /**
  * Drop-in replacement for mage/apply/main.
  *
- * Identical logic to the Magento core module except the inner setTimeout(fn)
- * inside init() is replaced with requestIdleCallback(fn, { timeout: 2000 }).
- * This spreads component initialization across browser idle periods instead of
- * queuing all callbacks back-to-back, which is the primary cause of high TBT
- * on pages with many data-mage-init / x-magento-init components.
+ * Identical logic to the Magento core module except non-critical component
+ * callbacks are scheduled with requestIdleCallback(fn, { timeout: 2000 }).
+ * This spreads expensive component initialization across browser idle periods
+ * instead of queuing all callbacks back-to-back.
  *
  * Falls back to setTimeout(fn, 0) on browsers without requestIdleCallback.
  *
@@ -27,23 +26,46 @@ define([
     var dataAttr = 'data-mage-init',
         nodeSelector = '[' + dataAttr + ']';
 
+    var criticalComponents = {
+        'Magento_Ui/js/core/app': true,
+        'Magento_Swatches/js/swatch-renderer': true,
+        configurable: true,
+        dropdownDialog: true
+    };
+
     /**
-     * Schedule a callback during browser idle time.
-     * timeout: 2000 ms guarantees execution even on a fully busy main thread.
+     * Schedule a component callback.
+     *
+     * Keep UI bootstrap widgets on Magento's original macrotask timing. Deferring
+     * them to idle can race Knockout scope/template resolution and briefly expose
+     * raw dropdown DOM before dropdownDialog upgrades it.
      */
-    var schedule = typeof requestIdleCallback !== 'undefined'
-        ? function (fn) { requestIdleCallback(fn, { timeout: 2000 }); }
-        : function (fn) { setTimeout(fn, 0); };
+    function schedule(fn, component) {
+        if (!_.isFunction(fn)) {
+            return;
+        }
+
+        if (criticalComponents[component]) {
+            setTimeout(fn, 0);
+            return;
+        }
+
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(fn, { timeout: 2000 });
+        } else {
+            setTimeout(fn, 0);
+        }
+    }
 
     /**
      * Initializes a single component on an element.
-     * Uses idle scheduling instead of setTimeout to avoid TBT spikes.
+     * Uses idle scheduling for non-critical components to avoid TBT spikes.
      */
     function init(el, config, component) {
         require([component], function (fn) {
             var $el;
 
-            if (typeof fn === 'object') {
+            if (typeof fn === 'object' && fn !== null && fn[component]) {
                 fn = fn[component].bind(fn);
             }
 
@@ -57,7 +79,7 @@ define([
                 }
             }
 
-            schedule(fn);
+            schedule(fn, component);
         }, function (error) {
             if ('console' in window && typeof window.console.error === 'function') {
                 console.error(error);
