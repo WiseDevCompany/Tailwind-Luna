@@ -31,9 +31,9 @@ define([
      * Schedule a callback during browser idle time.
      * timeout: 2000 ms guarantees execution even on a fully busy main thread.
      */
-    var schedule = typeof requestIdleCallback !== 'undefined'
-        ? function (fn) { requestIdleCallback(fn, { timeout: 2000 }); }
-        : function (fn) { setTimeout(fn, 0); };
+    var schedule = window.requestIdleCallback
+        ? function (fn) { window.requestIdleCallback(fn, { timeout: 2000 }); }
+        : function (fn) { window.setTimeout(fn, 0); };
 
     /**
      * Initializes a single component on an element.
@@ -56,8 +56,9 @@ define([
                     fn = $el[component].bind($el, config); // eslint-disable-line jquery-no-bind-unbind
                 }
             }
-
-            schedule(fn);
+            if (_.isFunction(fn)) {
+                schedule(fn);
+            }
         }, function (error) {
             if ('console' in window && typeof window.console.error === 'function') {
                 console.error(error);
